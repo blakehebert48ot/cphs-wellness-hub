@@ -1,4 +1,31 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // ========= Dark Mode Toggle =========
+    const darkModeBtn = document.getElementById('dark-mode-toggle');
+    const savedTheme = localStorage.getItem('theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateDarkModeIcon(savedTheme);
+
+    function updateDarkModeIcon(theme) {
+        if (!darkModeBtn) return;
+        const icon = darkModeBtn.querySelector('i');
+        if (theme === 'dark') {
+            icon.className = 'fa-solid fa-sun';
+        } else {
+            icon.className = 'fa-solid fa-moon';
+        }
+    }
+
+    if (darkModeBtn) {
+        darkModeBtn.addEventListener('click', () => {
+            const current = document.documentElement.getAttribute('data-theme');
+            const next = current === 'dark' ? 'light' : 'dark';
+            document.documentElement.setAttribute('data-theme', next);
+            localStorage.setItem('theme', next);
+            updateDarkModeIcon(next);
+        });
+    }
+
+    // ========= Chat Widget =========
     const chatToggle = document.getElementById('chat-toggle-btn');
     const chatWindow = document.getElementById('chat-window');
     const chatCta = document.getElementById('chat-cta');
@@ -129,57 +156,64 @@ document.addEventListener('DOMContentLoaded', () => {
         chatMessages.scrollTop = chatMessages.scrollHeight;
     }
 
-    // Handle Upvotes (with LocalStorage Anti-Spam Tracking)
-    document.querySelectorAll('.upvote-btn').forEach(btn => {
+    // Handle Upvotes using Event Delegation
+    document.addEventListener('click', async (e) => {
+        const btn = e.target.closest('.upvote-btn');
+        if (!btn) return;
+
         const winId = btn.getAttribute('data-win-id');
         
-        // Restore local memory on page load
+        // Prevent execution if local storage says already clicked
         if (localStorage.getItem(`upvoted_${winId}`)) {
-            btn.style.color = 'var(--primary-color)';
-            btn.style.cursor = 'not-allowed';
-            btn.classList.add('already-upvoted');
+            return;
         }
 
-        btn.addEventListener('click', async (e) => {
-            // Prevent execution if local storage says already clicked
-            if (localStorage.getItem(`upvoted_${winId}`)) {
-                return;
-            }
-
-            const targetIcon = btn.querySelector('i');
+        const targetIcon = btn.querySelector('i');
+        
+        try {
+            const response = await fetch(`/upvote/${winId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
             
-            try {
-                const response = await fetch(`/upvote/${winId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
+            const data = await response.json();
+            if (data.success) {
+                btn.querySelector('.upvote-count').textContent = data.upvotes;
                 
-                const data = await response.json();
-                if (data.success) {
-                    btn.querySelector('.upvote-count').textContent = data.upvotes;
-                    
-                    // Simple pop animation logic
-                    targetIcon.classList.remove('fa-regular');
-                    targetIcon.classList.add('fa-solid');
-                    setTimeout(() => {
-                        targetIcon.classList.remove('fa-solid');
-                        targetIcon.classList.add('fa-regular');
-                    }, 300);
+                // Simple pop animation logic
+                targetIcon.classList.remove('fa-regular');
+                targetIcon.classList.add('fa-solid');
+                setTimeout(() => {
+                    targetIcon.classList.remove('fa-solid');
+                    targetIcon.classList.add('fa-regular');
+                }, 300);
 
-                    // Lock out the button permanently for this browser
-                    localStorage.setItem(`upvoted_${winId}`, 'true');
-                    btn.style.color = 'var(--primary-color)';
-                    btn.style.cursor = 'not-allowed';
-                }
-            } catch (error) {
-                console.error('Error upvoting:', error);
+                // Lock out the button permanently for this browser
+                localStorage.setItem(`upvoted_${winId}`, 'true');
+                btn.style.color = 'var(--primary-color)';
+                btn.style.cursor = 'not-allowed';
+                btn.classList.add('already-upvoted');
+            }
+        } catch (error) {
+            console.error('Error upvoting:', error);
+        }
+    });
+
+    // Check existing buttons for already-upvoted state on load
+    function checkUpvotedStates() {
+        document.querySelectorAll('.upvote-btn').forEach(btn => {
+            const winId = btn.getAttribute('data-win-id');
+            if (localStorage.getItem(`upvoted_${winId}`)) {
+                btn.style.color = 'var(--primary-color)';
+                btn.style.cursor = 'not-allowed';
+                btn.classList.add('already-upvoted');
             }
         });
-    });
+    }
+    checkUpvotedStates();
 
     // Handle Category Filtering
     const filterBtns = document.querySelectorAll('.filter-btn');
-    const feedCards = document.querySelectorAll('.feed-card');
 
     filterBtns.forEach(btn => {
         btn.addEventListener('click', () => {
@@ -190,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             const filterValue = btn.getAttribute('data-filter');
 
-            feedCards.forEach(card => {
+            document.querySelectorAll('.feed-card').forEach(card => {
                 if (filterValue === 'all') {
                     card.style.display = 'flex';
                 } else if (card.getAttribute('data-category') === filterValue) {
@@ -233,8 +267,23 @@ document.addEventListener('DOMContentLoaded', () => {
                     const newCard = createCardHtml(data.win);
                     if (feedGrid) {
                         feedGrid.insertAdjacentHTML('afterbegin', newCard);
-                        // Trigger a slight "new item" animation if we had one, 
-                        // but JS insert is instant.
+                        
+                        // Ensure the new card respects the current filter
+                        const activeFilterBtn = document.querySelector('.filter-btn.active');
+                        const activeFilter = activeFilterBtn ? activeFilterBtn.getAttribute('data-filter') : 'all';
+                        const newlyAddedCard = feedGrid.firstElementChild;
+                        
+                        if (activeFilter !== 'all' && newlyAddedCard.getAttribute('data-category') !== activeFilter) {
+                            newlyAddedCard.style.display = 'none';
+                        }
+                        
+                        // 🎉 Celebration!
+                        confetti({
+                            particleCount: 150,
+                            spread: 70,
+                            origin: { y: 0.6 },
+                            colors: ['#0A5C36', '#10B981', '#C0C0C0', '#FCD34D']
+                        });
                     } else {
                         // If feed was empty (empty-state), reload might be needed or just replace the empty state
                         location.reload(); 
@@ -299,7 +348,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         return `
-            <div class="feed-card" data-category="${categoryLower}">
+            <div class="feed-card fade-in-up" data-category="${categoryLower}">
                 <div class="card-header">
                     <span class="category-tag tag-${categoryClass}">${win.category}</span>
                 </div>
@@ -328,9 +377,23 @@ document.addEventListener('DOMContentLoaded', () => {
         const percentage = Math.min((total / 100) * 100, 100);
         progressBar.style.width = percentage + '%';
         
+        // Update milestone markers
+        const milestones = document.querySelectorAll('.milestone');
+        milestones.forEach(m => {
+            const threshold = parseInt(m.getAttribute('data-label'));
+            if (!isNaN(threshold) && total >= threshold) {
+                m.classList.add('reached');
+            } else {
+                m.classList.remove('reached');
+            }
+        });
+        
         // Celebratory color if hit 100
         if (total >= 100) {
             progressBar.style.background = 'linear-gradient(90deg, #D4AF37, #FFD700)';
+            // Light up the trophy too
+            const trophy = document.querySelector('.milestone-final');
+            if (trophy) trophy.classList.add('reached');
         }
     }
 

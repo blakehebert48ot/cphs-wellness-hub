@@ -3,7 +3,6 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <!-- SEO Best Practices -->
     <title>{% block title %}CPHS Wellness Hub | Timberwolf Pride{% endblock %}</title>
     <meta name="description" content="A positive community wellness hub for CPHS students to share and track healthy daily habits.">
     
@@ -13,22 +12,38 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     
     <!-- Main Stylesheet -->
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.7">
-    
-    <style>
-        body {
-            background: linear-gradient(135deg, #F8FAFC 0%, #F0F9FF 50%, #ECFDF5 100%);
-            background-attachment: fixed;
-            min-height: 100vh;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=3.0">
     
     <!-- FontAwesome for Icons -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- INLINE THEME CHECK (Prevents white flash in dark mode) -->
+    <script>
+        (function() {
+            const savedTheme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+        })();
+    </script>
 </head>
 <body>
     <header>
-        <h1>🐺 CPHS Wellness Hub</h1>
+        <div class="header-top">
+            <h1><a href="/" class="logo-link">🐺 CPHS Wellness Hub</a></h1>
+            <nav class="header-nav">
+                <a href="/" class="nav-link {% if request.path == '/' %}active{% endif %}">
+                    <i class="fa-solid fa-house"></i> Feed
+                </a>
+                <button id="focus-mode-btn" class="nav-link focus-trigger">
+                    <i class="fa-solid fa-crosshairs"></i> Focus Mode
+                </button>
+                <a href="/resources" class="nav-link {% if request.path == '/resources' %}active{% endif %}">
+                    <i class="fa-solid fa-book-open"></i> Resources
+                </a>
+                <button id="dark-mode-toggle" class="dark-mode-btn" aria-label="Toggle dark mode">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+            </nav>
+        </div>
         <p>A collective pulse on wellness at our school.</p>
     </header>
     
@@ -36,9 +51,79 @@
         {% block content %}{% endblock %}
     </main>
 
-    <!-- Main JavaScript with cache-buster -->
+    <!-- Floating Chat Widget -->
+    <div class="floating-chat-container">
+        <div class="chat-cta" id="chat-cta">
+            Need a study hack or de-stress break? Talk to your Peer Mentor!
+        </div>
+        <button id="chat-toggle-btn" class="chat-fab" aria-label="Open Peer Mentor Chat">
+            <i class="fa-solid fa-user-graduate"></i>
+        </button>
+        
+        <div id="chat-window" class="chat-window hidden">
+            <div class="chat-header">
+                <h3><i class="fa-solid fa-graduation-cap"></i> Timberwolf Peer Mentor</h3>
+                <button id="close-chat-btn" aria-label="Close Chat"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="chat-messages" id="chat-messages">
+                <div class="chat-message ai-message">
+                    Hi! I'm your Timberwolf Peer Mentor. I'm here to help you de-stress and stay focused. What's on your mind?
+                </div>
+            </div>
+            <form id="chat-form" class="chat-form">
+                <input type="text" id="chat-input" placeholder="Get advice from your CPHS Peer..." autocomplete="off">
+                <button type="submit" aria-label="Send Message"><i class="fa-solid fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- ========= FOCUS MODE OVERLAY ========= -->
+    <div id="focus-overlay" class="focus-overlay hidden">
+        <button id="focus-exit" class="focus-exit" aria-label="Exit Focus Mode">
+            <i class="fa-solid fa-xmark"></i> Exit
+        </button>
+
+        <div class="focus-content">
+            <!-- Breathing ring animation behind the timer -->
+            <div class="breathing-ring"></div>
+
+            <div class="focus-timer-display">
+                <span id="focus-minutes">25</span><span class="timer-colon">:</span><span id="focus-seconds">00</span>
+            </div>
+
+            <p class="focus-label" id="focus-label">Ready to focus?</p>
+
+            <div class="focus-controls">
+                <button id="focus-start" class="focus-btn focus-btn-primary">
+                    <i class="fa-solid fa-play"></i> <span class="btn-text">Start</span>
+                </button>
+                <button id="focus-pause" class="focus-btn focus-btn-secondary" disabled>
+                    <i class="fa-solid fa-pause"></i> <span class="btn-text">Pause</span>
+                </button>
+                <button id="focus-reset" class="focus-btn focus-btn-ghost" disabled>
+                    <i class="fa-solid fa-rotate-left"></i> <span class="btn-text">Reset</span>
+                </button>
+            </div>
+
+            <div class="focus-mode-selector">
+                <button class="mode-chip active" data-minutes="25" data-mode="focus">🎯 Focus (25m)</button>
+                <button class="mode-chip" data-minutes="5" data-mode="break">☕ Break (5m)</button>
+                <button class="mode-chip" data-minutes="15" data-mode="long-break">🧘 Long Break (15m)</button>
+            </div>
+
+            <div class="session-counter">
+                <span id="session-count">0</span> sessions completed today
+            </div>
+
+            <p class="focus-quote" id="focus-quote">"The secret of getting ahead is getting started."</p>
+        </div>
+    </div>
+
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="{{ url_for('static', filename='js/app.js') }}?v=1.6"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=3.0"></script>
+    <script src="{{ url_for('static', filename='js/focus.js') }}?v=1.0"></script>
 </body>
 </html>

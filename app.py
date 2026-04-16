@@ -12,6 +12,42 @@ load_dotenv()
 # Configure Gemini
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"), transport='rest')
 
+def is_offensive(text):
+    """
+    Local guardrail to catch obvious slurs and common character-substitution bypasses.
+    Returns True if offensive patterns are detected.
+    """
+    if not text:
+        return False
+        
+    # Standard character substitutions to check for
+    subs = {
+        'a': '[a4@]',
+        'e': '[e3]',
+        'i': '[i1!|]',
+        'o': '[o0]',
+        's': '[s5$]',
+        'n': '[nv]', # Catching the specific bypass found today
+        'g': '[g9]',
+        't': '[t7]'
+    }
+    
+    # Critical patterns (obfuscated here to catch obfuscated input)
+    # This list is specifically designed to catch the slur variation identified by the user
+    # and other common high-risk patterns.
+    patterns = [
+        # Variation of the N-word found (e.g., vigga, n1gga, etc)
+        f"{subs['n']}{subs['i']}{subs['g']}{subs['g']}{subs['a']}",
+        # Add other high-risk patterns here as needed
+        r'\b[f|][u|*][c|k][k|]\b', # Basic profanity
+    ]
+    
+    clean_text = text.lower().strip()
+    for pattern in patterns:
+        if re.search(pattern, clean_text, re.IGNORECASE):
+            return True
+    return False
+
 # Create the model with System Instruction for the AI Coach persona
 generation_config = {
   "temperature": 0.7,
@@ -23,7 +59,14 @@ generation_config = {
 model = genai.GenerativeModel(
     model_name="gemini-flash-lite-latest",
     generation_config=generation_config,
-    system_instruction="You are a Timberwolf Peer Mentor at CPHS. You provide supportive, student-to-student advice on health, study habits, and de-stressing. IMPORTANT: Never identify as an AI. Talk like a real, supportive high school student. Be extremely warm, friendly, and complimentary. Use phrases like 'as a fellow Timberwolf' or 'I totally get it.' KEEP RESPONSES EXTREMELY SHORT: Strictly 1-2 brief paragraphs maximum. Avoid robotic or clinical language."
+    system_instruction=(
+        "You are a Timberwolf Peer Mentor at CPHS. You provide supportive, student-to-student advice. "
+        "CRITICAL SAFETY RULE: You are also a moderator. If the user input contains ANY slurs, "
+        "profanity, leetspeak, or character substitutions meant to bypass filters, you MUST reject it. "
+        "If the input is nonsense, ambiguous, or not clearly a positive wellness habit, you MUST reject it. "
+        "Talk like a real high school student, but keep it clean and safe. "
+        "KEEP RESPONSES EXTREMELY SHORT: Strictly 1-2 brief paragraphs maximum."
+    )
 )
 
 app = Flask(__name__)
@@ -37,6 +80,8 @@ def format_timestamp(ts):
     try:
         # Simple parsing for sqlite builtin CURRENT_TIMESTAMP "YYYY-MM-DD HH:MM:SS"
         dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+        # Shift -5 hours for Central Time (adjusting UTC code to local)
+        dt = dt - datetime.timedelta(hours=5)
         return dt.strftime("%b %d, %I:%M %p")
     except Exception:
         return ts
@@ -51,7 +96,25 @@ def feed():
     wins = conn.execute('SELECT * FROM wins ORDER BY timestamp DESC').fetchall()
     conn.close()
     
-    return render_template('index.html', wins=wins)
+    # Dynamic Daily Mission based on day of week
+    missions = {
+        0: {"category": "Movement", "icon": "fa-person-running", "title": "Movement Monday", "desc": "Get your body moving! Share a Movement habit today."},
+        1: {"category": "Hydration", "icon": "fa-droplet", "title": "Hydration Tuesday", "desc": "Stay hydrated! Share a Hydration habit today."},
+        2: {"category": "Mindfulness", "icon": "fa-brain", "title": "Mindful Wednesday", "desc": "Find your focus. Share a Mindfulness habit today."},
+        3: {"category": "Nutrition", "icon": "fa-apple-whole", "title": "Nutrition Thursday", "desc": "Fuel your body right! Share a Nutrition habit today."},
+        4: {"category": "Sleep", "icon": "fa-moon", "title": "Sleep Friday", "desc": "Rest up for the weekend! Share a Sleep habit today."},
+        5: {"category": "Digital Detox", "icon": "fa-power-off", "title": "Digital Detox Saturday", "desc": "Unplug and recharge. Share a Digital Detox habit!"},
+        6: {"category": "Mindfulness", "icon": "fa-spa", "title": "Self-Care Sunday", "desc": "Take care of yourself. Share any wellness habit today!"},
+    }
+    today_local = datetime.datetime.now() - datetime.timedelta(hours=5)
+    today = today_local.weekday()
+    mission = missions.get(today, missions[0])
+    
+    return render_template('index.html', wins=wins, mission=mission)
+
+@app.route('/resources')
+def resources():
+    return render_template('resources.html')
 
 @app.route('/submit-win', methods=['POST'])
 def submit_win():
@@ -62,12 +125,25 @@ def submit_win():
     if not habit or not category:
         return jsonify({'success': False, 'error': 'Habit and category are required.'}), 400
 
+    # Level 1: Local Keyword/Regex Filter
+    if is_offensive(habit):
+        print(f"Local Filter blocked post: {habit}")
+        return jsonify({'success': False, 'error': 'rejected'})
+
     ai_cheer = None
     try:
+        # Level 2: Hardened AI Bouncer
+        base_mod_instruction = (
+            "Analyze this habit. It MUST be a genuine, healthy physical or mental wellness habit. "
+            "If it is toxic, offensive, dangerous, undeniable spam, or NOT a wellness habit at all, "
+            "reply with exactly the word REJECT. Also REJECT if it uses character substitutions (leetspeak) "
+            "to sneak in bad words. If it is ambiguous or nonsense, REJECT. "
+        )
+        
         if ask_ai:
-            mod_prompt = f"Analyze this habit. It MUST be a genuine, healthy physical or mental wellness habit. If it is toxic, offensive, dangerous, undeniable spam, or NOT a wellness habit at all, reply with exactly the word REJECT. Otherwise, reply directly with a 1-sentence enthusiastic, validating cheer for someone who just completed it. Habit: {habit}"
+            mod_prompt = base_mod_instruction + f"Otherwise, reply directly with a 1-sentence enthusiastic, validating cheer. Habit: {habit}"
         else:
-            mod_prompt = f"Analyze this habit. It MUST be a genuine, healthy physical or mental wellness habit. If it is toxic, offensive, dangerous, undeniable spam, or NOT a wellness habit at all, reply with exactly the word REJECT. Otherwise, reply with exactly the word APPROVE. Habit: {habit}"
+            mod_prompt = base_mod_instruction + f"Otherwise, reply with exactly the word APPROVE. Habit: {habit}"
             
         mod_response = model.generate_content(mod_prompt)
         result_text = mod_response.text.strip(' "\'')

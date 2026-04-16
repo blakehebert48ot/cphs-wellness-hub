@@ -5,159 +5,155 @@
 <section class="glass-panel submit-section" aria-labelledby="form-heading">
     <h2 id="form-heading" class="visually-hidden" style="display: none;">Share Your Win</h2>
     <form class="submit-form" id="win-submit-form">
-        <div class="input-group">
-            <label for="habit" class="input-label">What healthy habit did you complete today?</label>
-            <input 
-                type="text" 
-                id="habit" 
-                name="habit" 
-                placeholder="e.g., Slept 8 hours, 15-minute walk, Drank 64oz water" 
-                required 
-                maxlength="200"
-                autocomplete="off"
-            >
+        <div class="form-row">
+            <div class="input-group input-group-grow">
+                <label for="habit" class="input-label">What healthy habit did you complete today?</label>
+                <input 
+                    type="text" 
+                    id="habit" 
+                    name="habit" 
+                    placeholder="e.g., Slept 8 hours, 15-minute walk, Drank 64oz water" 
+                    required 
+                    maxlength="200"
+                    autocomplete="off"
+                >
+            </div>
+            <div class="input-group input-group-select">
+                <label for="category" class="input-label">Category</label>
+                <select id="category" name="category" required>
+                    <option value="Movement" selected>Movement</option>
+                    <option value="Sleep">Sleep</option>
+                    <option value="Hydration">Hydration</option>
+                    <option value="Mindfulness">Mindfulness</option>
+                    <option value="Nutrition">Nutrition</option>
+                    <option value="Digital Detox">Digital Detox</option>
+                </select>
+            </div>
         </div>
-        <div class="input-group">
-            <label for="category" class="input-label">Category</label>
-            <select id="category" name="category" required>
-                <option value="Movement" selected>Movement</option>
-                <option value="Sleep">Sleep</option>
-                <option value="Hydration">Hydration</option>
-                <option value="Mindfulness">Mindfulness</option>
-                <option value="Nutrition">Nutrition</option>
-                <option value="Digital Detox">Digital Detox</option>
-            </select>
-        </div>
-        <div class="input-group">
+        <div class="form-actions">
             <label class="checkbox-container">
                 <input type="checkbox" name="ask_ai" id="ask_ai">
                 Get a cheer from your Peer Mentor!
             </label>
+            <button type="submit" class="btn-submit" id="submit-button">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 5v14M5 12h14"/>
+                </svg>
+                Share Win
+            </button>
         </div>
-        <button type="submit" class="btn-submit" id="submit-button">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 5v14M5 12h14"/>
-            </svg>
-            Share Win
-        </button>
     </form>
 </section>
 
-<!-- Community Goal Bar -->
-<section class="community-goal-section">
-    <div class="goal-card">
-        <div class="goal-header">
-            <h3>School-Wide Goal</h3>
-            <div class="goal-stats">
-                <span id="current-total">0</span> / 100 Habits
-            </div>
+<!-- Two-Column Layout -->
+<div class="main-grid">
+    <!-- LEFT: Community Feed -->
+    <section class="feed-section" aria-labelledby="feed-heading">
+        <div class="feed-header">
+            <h2 id="feed-heading">Community Feed</h2>
         </div>
-        <div class="progress-track">
-            <div id="goal-progress-bar" class="progress-fill" style="width: 0%;"></div>
+
+        <div id="ajax-error-container"></div>
+        
+        {% if request.args.get('error') == 'rejected' %}
+        <div class="error-banner">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>Your post was flagged by the system and could not be submitted.</span>
         </div>
-    </div>
-</section>
-
-<!-- Chart Analytics -->
-<section class="chart-section" aria-labelledby="chart-heading">
-    <h3 id="chart-heading" style="text-align: center; margin-bottom: 1rem; color: var(--text-main); font-weight: 700;">Today's Community Impact</h3>
-    <div class="chart-container" style="position: relative; height:200px; width:100%; max-width: 600px; margin: 0 auto 2rem; background: white; border-radius: var(--radius); padding: 1rem; box-shadow: var(--shadow-sm); border: 1px solid #E2E8F0;">
-        <canvas id="progressChart"></canvas>
-    </div>
-</section>
-
-<!-- Community Feed -->
-<section class="feed-section" aria-labelledby="feed-heading">
-    <div class="feed-header">
-        <h2 id="feed-heading">Community Feed</h2>
-    </div>
-
-    <div id="ajax-error-container"></div>
-    
-    {% if request.args.get('error') == 'rejected' %}
-    <div class="error-banner">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        <span>Your post was flagged by the system and could not be submitted.</span>
-    </div>
-    {% elif request.args.get('error') == 'timeout' %}
-    <div class="error-banner">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        <span>The Peer Mentor is busy. Please try again later.</span>
-    </div>
-    {% elif request.args.get('error') == 'ratelimit' %}
-    <div class="error-banner">
-        <i class="fa-solid fa-triangle-exclamation"></i>
-        <span>The Peer Mentor is currently overwhelmed! Please wait 60 seconds and try sharing your win again.</span>
-    </div>
-    {% endif %}
-    
-    <div class="filter-menu" id="filter-menu">
-        <button class="filter-btn active" data-filter="all">All</button>
-        <button class="filter-btn" data-filter="movement">Movement</button>
-        <button class="filter-btn" data-filter="sleep">Sleep</button>
-        <button class="filter-btn" data-filter="hydration">Hydration</button>
-        <button class="filter-btn" data-filter="mindfulness">Mindfulness</button>
-        <button class="filter-btn" data-filter="nutrition">Nutrition</button>
-        <button class="filter-btn" data-filter="digital detox">Digital Detox</button>
-    </div>
-    
-    {% if wins %}
-    <div class="feed-grid" id="community-feed">
-        {% for win in wins %}
-        <div class="feed-card" data-category="{{ win['category'] | lower }}">
-            <div class="card-header">
-                <span class="category-tag tag-{{ win['category'] | lower | replace(' ', '-') }}">{{ win['category'] }}</span>
-            </div>
-            <p class="habit-text">{{ win['habit'] }}</p>
-            <div class="habit-meta">
-                <div class="meta-time">
-                    <i class="fa-regular fa-clock time-icon"></i>
-                    <time datetime="{{ win['timestamp'] }}">{{ win['timestamp'] | format_time }}</time>
+        {% elif request.args.get('error') == 'timeout' %}
+        <div class="error-banner">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>The Peer Mentor is busy. Please try again later.</span>
+        </div>
+        {% elif request.args.get('error') == 'ratelimit' %}
+        <div class="error-banner">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <span>The Peer Mentor is currently overwhelmed! Please wait 60 seconds and try sharing your win again.</span>
+        </div>
+        {% endif %}
+        
+        <div class="filter-menu" id="filter-menu">
+            <button class="filter-btn active" data-filter="all">All</button>
+            <button class="filter-btn" data-filter="movement">Movement</button>
+            <button class="filter-btn" data-filter="sleep">Sleep</button>
+            <button class="filter-btn" data-filter="hydration">Hydration</button>
+            <button class="filter-btn" data-filter="mindfulness">Mindfulness</button>
+            <button class="filter-btn" data-filter="nutrition">Nutrition</button>
+            <button class="filter-btn" data-filter="digital detox">Digital Detox</button>
+        </div>
+        
+        {% if wins %}
+        <div class="feed-grid" id="community-feed">
+            {% for win in wins %}
+            <div class="feed-card fade-in-up" data-category="{{ win['category'] | lower }}">
+                <div class="card-header">
+                    <span class="category-tag tag-{{ win['category'] | lower | replace(' ', '-') }}">{{ win['category'] }}</span>
                 </div>
-                <button class="upvote-btn" data-win-id="{{ win['id'] }}" aria-label="Upvote this win">
-                    <i class="fa-regular fa-thumbs-up"></i> <span class="upvote-count">{{ win['upvotes'] }}</span>
-                </button>
+                <p class="habit-text">{{ win['habit'] }}</p>
+                <div class="habit-meta">
+                    <div class="meta-time">
+                        <i class="fa-regular fa-clock time-icon"></i>
+                        <time datetime="{{ win['timestamp'] }}">{{ win['timestamp'] | format_time }}</time>
+                    </div>
+                    <button class="upvote-btn" data-win-id="{{ win['id'] }}" aria-label="Upvote this win">
+                        <i class="fa-regular fa-thumbs-up"></i> <span class="upvote-count">{{ win['upvotes'] }}</span>
+                    </button>
+                </div>
+                
+                {% if win['ai_cheer'] %}
+                <div class="ai-cheer-box">
+                    <i class="fa-solid fa-graduation-cap cheer-icon"></i>
+                    <p>{{ win['ai_cheer'] }}</p>
+                </div>
+                {% endif %}
             </div>
-            
-            {% if win['ai_cheer'] %}
-            <div class="ai-cheer-box">
-                <i class="fa-solid fa-graduation-cap cheer-icon"></i>
-                <p>{{ win['ai_cheer'] }}</p>
-            </div>
-            {% endif %}
+            {% endfor %}
         </div>
-        {% endfor %}
-    </div>
-    {% else %}
-    <div class="empty-state">
-        <p>No wins shared yet. Be the first to start the positive streak!</p>
-    </div>
-    {% endif %}
-</section>
+        {% else %}
+        <div class="empty-state">
+            <p>No wins shared yet. Be the first to start the positive streak!</p>
+        </div>
+        {% endif %}
+    </section>
 
-<!-- Floating Chat Widget -->
-<div class="floating-chat-container">
-    <div class="chat-cta" id="chat-cta">
-        Need a study hack or de-stress break? Talk to your Peer Mentor!
-    </div>
-    <button id="chat-toggle-btn" class="chat-fab" aria-label="Open Peer Mentor Chat">
-        <i class="fa-solid fa-user-graduate"></i>
-    </button>
-    
-    <div id="chat-window" class="chat-window hidden">
-        <div class="chat-header">
-            <h3><i class="fa-solid fa-graduation-cap"></i> Timberwolf Peer Mentor</h3>
-            <button id="close-chat-btn" aria-label="Close Chat"><i class="fa-solid fa-times"></i></button>
-        </div>
-        <div class="chat-messages" id="chat-messages">
-            <div class="chat-message ai-message">
-                Hi! I'm your Timberwolf Peer Mentor. I'm here to help you de-stress and stay focused. What's on your mind?
+    <!-- RIGHT: Sidebar -->
+    <aside class="sidebar">
+        <!-- Daily Mission -->
+        <div class="mission-card sidebar-card fade-in-up">
+            <div class="mission-icon">
+                <i class="fa-solid {{ mission.icon }}"></i>
+            </div>
+            <div class="mission-content">
+                <h3>{{ mission.title }}</h3>
+                <p>{{ mission.desc }}</p>
             </div>
         </div>
-        <form id="chat-form" class="chat-form">
-            <input type="text" id="chat-input" placeholder="Get advice from your CPHS Peer..." autocomplete="off">
-            <button type="submit" aria-label="Send Message"><i class="fa-solid fa-paper-plane"></i></button>
-        </form>
-    </div>
+
+        <!-- School-Wide Goal -->
+        <div class="goal-card sidebar-card fade-in-up">
+            <div class="goal-header">
+                <h3>School-Wide Goal</h3>
+                <div class="goal-stats">
+                    <span id="current-total">0</span> / 100
+                </div>
+            </div>
+            <div class="progress-track">
+                <div id="goal-progress-bar" class="progress-fill" style="width: 0%;"></div>
+                <div class="milestone" style="left: 25%;" data-label="25"><i class="fa-solid fa-flag"></i></div>
+                <div class="milestone" style="left: 50%;" data-label="50"><i class="fa-solid fa-star"></i></div>
+                <div class="milestone" style="left: 75%;" data-label="75"><i class="fa-solid fa-fire"></i></div>
+                <div class="milestone milestone-final" style="left: 100%;" data-label="🏆"><i class="fa-solid fa-trophy"></i></div>
+            </div>
+        </div>
+
+        <!-- Chart Analytics -->
+        <div class="sidebar-card chart-card fade-in-up">
+            <h3 class="sidebar-card-title">Today's Impact</h3>
+            <div class="chart-container-sidebar">
+                <canvas id="progressChart"></canvas>
+            </div>
+        </div>
+    </aside>
 </div>
+
 {% endblock %}
