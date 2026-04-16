@@ -1,0 +1,16 @@
+# Environment Variables (Sensitive)
+.env
+
+# Database
+app.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+ENV/
+
+# OS Files
+.DS_Store
+Thumbs.db

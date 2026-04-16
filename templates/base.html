@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- SEO Best Practices -->
+    <title>{% block title %}CPHS Wellness Hub | Timberwolf Pride{% endblock %}</title>
+    <meta name="description" content="A positive community wellness hub for CPHS students to share and track healthy daily habits.">
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}?v=1.7">
+    
+    <style>
+        body {
+            background: linear-gradient(135deg, #F8FAFC 0%, #F0F9FF 50%, #ECFDF5 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+        }
+    </style>
+    
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <header>
+        <h1>🐺 CPHS Wellness Hub</h1>
+        <p>A collective pulse on wellness at our school.</p>
+    </header>
+    
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Main JavaScript with cache-buster -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="{{ url_for('static', filename='js/app.js') }}?v=1.6"></script>
+</body>
+</html>
