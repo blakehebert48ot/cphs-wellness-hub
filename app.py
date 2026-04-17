@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Configure Gemini
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"), transport='rest')
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
 def is_offensive(text):
     """
@@ -248,7 +248,7 @@ def chat():
             response = chat_session.send_message(
                 user_message, 
                 stream=True,
-                request_options={"timeout": 15.0}
+                request_options={"timeout": 30.0}
             )
             for chunk in response:
                 if chunk.text:

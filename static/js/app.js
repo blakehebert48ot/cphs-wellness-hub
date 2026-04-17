@@ -61,7 +61,7 @@ document.addEventListener('DOMContentLoaded', () => {
         chatInput.value = '';
 
         // Add to history
-        chatHistory.push({ role: "user", parts: message });
+        chatHistory.push({ role: "user", parts: [message] });
 
         // Add typing indicator
         const typingId = 'typing-' + Date.now();
@@ -121,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Save AI response to history
-            chatHistory.push({ role: "model", parts: accumulatedText });
+            chatHistory.push({ role: "model", parts: [accumulatedText] });
 
             // Prune history to last 10 messages (5 user, 5 model) to keep tokens low
             if (chatHistory.length > 10) {
