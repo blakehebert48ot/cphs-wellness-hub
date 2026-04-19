@@ -58,7 +58,7 @@ generation_config = {
 }
 
 model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash-lite",
+    model_name="gemini-2.5-flash-lite",
     generation_config=generation_config,
     system_instruction=(
         "You are a Timberwolf Peer Mentor at CPHS. You provide supportive, student-to-student advice. "
