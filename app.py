@@ -5,6 +5,7 @@ import os
 import re
 import google.generativeai as genai
 from dotenv import load_dotenv
+from psycopg2.extras import RealDictCursor
 
 # Load environment variables
 load_dotenv()
@@ -76,24 +77,31 @@ app.secret_key = 'super-secret-wellness-key'  # Used for flash messages if neede
 database.init_db()
 
 def format_timestamp(ts):
-    """Helper to convert UTC timestamp to a friendlier format if needed."""
+    """Helper to convert UTC timestamp to a friendlier format."""
     try:
-        # Simple parsing for sqlite builtin CURRENT_TIMESTAMP "YYYY-MM-DD HH:MM:SS"
-        dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-        # Shift -5 hours for Central Time (adjusting UTC code to local)
+        # Postgres returns datetime objects, SQLite returns strings
+        if isinstance(ts, str):
+            dt = datetime.datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
+        else:
+            dt = ts
+        # Shift -5 hours for Central Time
         dt = dt - datetime.timedelta(hours=5)
         return dt.strftime("%b %d, %I:%M %p")
     except Exception:
-        return ts
+        return str(ts)
 
 # Register the filter to be used in jinja templates
 app.jinja_env.filters['format_time'] = format_timestamp
 
 @app.route('/')
 def feed():
-    conn = database.get_db_connection()
-    # Query all wins ordered by most recent first
-    wins = conn.execute('SELECT * FROM wins ORDER BY timestamp DESC').fetchall()
+    conn, db_type = database.get_db_connection()
+    if db_type == "postgres":
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+        cursor.execute('SELECT * FROM wins ORDER BY timestamp DESC')
+        wins = cursor.fetchall()
+    else:
+        wins = conn.execute('SELECT * FROM wins ORDER BY timestamp DESC').fetchall()
     conn.close()
     
     # Dynamic Daily Mission based on day of week
@@ -161,14 +169,26 @@ def submit_win():
             return jsonify({'success': False, 'error': 'ratelimit'})
         return jsonify({'success': False, 'error': 'timeout'})
 
-    conn = database.get_db_connection()
+    conn, db_type = database.get_db_connection()
     c = conn.cursor()
-    c.execute('INSERT INTO wins (habit, category, ai_cheer) VALUES (?, ?, ?)', (habit, category, ai_cheer))
-    win_id = c.lastrowid
+    
+    if db_type == "postgres":
+        c.execute('INSERT INTO wins (habit, category, ai_cheer) VALUES (%s, %s, %s) RETURNING id', (habit, category, ai_cheer))
+        win_id = c.fetchone()[0]
+    else:
+        c.execute('INSERT INTO wins (habit, category, ai_cheer) VALUES (?, ?, ?)', (habit, category, ai_cheer))
+        win_id = c.lastrowid
+        
     conn.commit()
     
     # Get the inserted win to return formatted data
-    win = conn.execute('SELECT * FROM wins WHERE id = ?', (win_id,)).fetchone()
+    if db_type == "postgres":
+        c = conn.cursor(cursor_factory=RealDictCursor)
+        c.execute('SELECT * FROM wins WHERE id = %s', (win_id,))
+        win = c.fetchone()
+    else:
+        win = conn.execute('SELECT * FROM wins WHERE id = ?', (win_id,)).fetchone()
+        
     conn.close()
     
     return jsonify({
@@ -185,20 +205,33 @@ def submit_win():
 
 @app.route('/api/chart-data', methods=['GET'])
 def chart_data():
-    conn = database.get_db_connection()
-    c = conn.cursor()
-    # Get counts for today's wins, grouped by Category
-    c.execute('''
-        SELECT category as label, count(*) as count 
-        FROM wins 
-        WHERE date(timestamp) = date('now')
-        GROUP BY category
-    ''')
+    conn, db_type = database.get_db_connection()
+    if db_type == "postgres":
+        c = conn.cursor(cursor_factory=RealDictCursor)
+        c.execute('''
+            SELECT category as label, count(*) as count 
+            FROM wins 
+            WHERE DATE(timestamp) = CURRENT_DATE
+            GROUP BY category
+        ''')
+    else:
+        c = conn.cursor()
+        c.execute('''
+            SELECT category as label, count(*) as count 
+            FROM wins 
+            WHERE date(timestamp) = date('now')
+            GROUP BY category
+        ''')
     rows = c.fetchall()
     
     # Get total count of ALL wins for the community progress bar
-    c.execute('SELECT COUNT(*) as total FROM wins')
-    total_count = c.fetchone()['total']
+    if db_type == "postgres":
+        c.execute('SELECT COUNT(*) as total FROM wins')
+        total_count = c.fetchone()['total']
+    else:
+        # SQLite
+        c.execute('SELECT COUNT(*) as total FROM wins')
+        total_count = c.fetchone()['total']
     
     conn.close()
     
@@ -214,12 +247,20 @@ def chart_data():
 
 @app.route('/upvote/<int:win_id>', methods=['POST'])
 def upvote_win(win_id):
-    conn = database.get_db_connection()
+    conn, db_type = database.get_db_connection()
     c = conn.cursor()
-    c.execute('UPDATE wins SET upvotes = upvotes + 1 WHERE id = ?', (win_id,))
+    placeholder = "%s" if db_type == "postgres" else "?"
+    c.execute(f'UPDATE wins SET upvotes = upvotes + 1 WHERE id = {placeholder}', (win_id,))
     conn.commit()
-    c.execute('SELECT upvotes FROM wins WHERE id = ?', (win_id,))
-    new_upvotes = c.fetchone()['upvotes']
+    
+    if db_type == "postgres":
+        c = conn.cursor(cursor_factory=RealDictCursor)
+        c.execute('SELECT upvotes FROM wins WHERE id = %s', (win_id,))
+        new_upvotes = c.fetchone()['upvotes']
+    else:
+        c.execute('SELECT upvotes FROM wins WHERE id = ?', (win_id,))
+        new_upvotes = c.fetchone()['upvotes']
+        
     conn.close()
     return jsonify({'success': True, 'upvotes': new_upvotes})
 
