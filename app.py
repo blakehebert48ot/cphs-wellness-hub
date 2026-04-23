@@ -149,7 +149,7 @@ def submit_win():
         )
         
         if ask_ai:
-            mod_prompt = base_mod_instruction + f"Otherwise, reply directly with a 1-sentence enthusiastic, validating cheer. Habit: {habit}"
+            mod_prompt = base_mod_instruction + f"Otherwise, reply directly with ONLY a 1-sentence enthusiastic, validating cheer. DO NOT say 'APPROVE'. Habit: {habit}"
         else:
             mod_prompt = base_mod_instruction + f"Otherwise, reply with exactly the word APPROVE. Habit: {habit}"
             
@@ -161,7 +161,10 @@ def submit_win():
             return jsonify({'success': False, 'error': 'rejected'})
             
         if ask_ai and result_text.upper() != "APPROVE":
-            ai_cheer = result_text
+            # Strip "APPROVE", "Approve.", "APPROVE: " etc. from the beginning
+            ai_cheer = re.sub(r'(?i)^APPROVE[\s\.\!\-\:]*', '', result_text).strip()
+            if not ai_cheer:
+                ai_cheer = "Great job on your wellness habit!"
             
     except Exception as e:
         print(f"Moderation error: {e}")
