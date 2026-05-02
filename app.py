@@ -3,6 +3,9 @@ import database
 import datetime
 import os
 import re
+import threading
+import time
+import requests as http_requests
 import google.generativeai as genai
 from dotenv import load_dotenv
 from psycopg2.extras import RealDictCursor
@@ -304,6 +307,39 @@ def chat():
             yield f"data: {error_payload}\n\n"
 
     return Response(stream_with_context(generate()), mimetype='text/event-stream')
+
+@app.route('/health')
+def health():
+    """Lightweight health-check endpoint used by the keep-alive pinger."""
+    return 'OK', 200
+
+
+# --------------- Keep-Alive Self-Ping ---------------
+def keep_alive():
+    """
+    Background thread that pings our own /health endpoint every 14 minutes
+    to prevent Render's free-tier from spinning down after 15 min of inactivity.
+    Only runs when RENDER_EXTERNAL_URL is set (i.e. on Render, not locally).
+    """
+    url = os.getenv('RENDER_EXTERNAL_URL')
+    if not url:
+        return  # Not on Render, nothing to do
+    ping_url = f"{url}/health"
+    while True:
+        time.sleep(14 * 60)  # 14 minutes
+        try:
+            http_requests.get(ping_url, timeout=10)
+            print(f"[keep-alive] pinged {ping_url}")
+        except Exception as e:
+            print(f"[keep-alive] ping failed: {e}")
+
+
+# Start the keep-alive thread only on Render
+if os.getenv('RENDER_EXTERNAL_URL'):
+    pinger = threading.Thread(target=keep_alive, daemon=True)
+    pinger.start()
+    print("[keep-alive] background pinger started")
+
 
 if __name__ == '__main__':
     # Run the app locally on port 5001
