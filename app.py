@@ -130,11 +130,10 @@ def resources():
 @app.route('/submit-win', methods=['POST'])
 def submit_win():
     habit = request.form.get('habit')
-    category = request.form.get('category')
     ask_ai = request.form.get('ask_ai') == 'on'
     
-    if not habit or not category:
-        return jsonify({'success': False, 'error': 'Habit and category are required.'}), 400
+    if not habit:
+        return jsonify({'success': False, 'error': 'Habit is required.'}), 400
 
     # Level 1: Local Keyword/Regex Filter
     if is_offensive(habit):
@@ -142,32 +141,66 @@ def submit_win():
         return jsonify({'success': False, 'error': 'rejected'})
 
     ai_cheer = None
+    category = 'Movement'  # Default fallback
+    
+    # Valid categories the AI can assign
+    valid_categories = ['Movement', 'Sleep', 'Hydration', 'Mindfulness', 'Nutrition', 'Digital Detox']
+    
     try:
-        # Level 2: Hardened AI Bouncer
-        base_mod_instruction = (
+        # Level 2: Hardened AI Bouncer + Auto-Categorizer
+        category_instruction = (
             "Analyze this habit. It MUST be a genuine, healthy physical or mental wellness habit. "
             "If it is toxic, offensive, dangerous, undeniable spam, or NOT a wellness habit at all, "
             "reply with exactly the word REJECT. Also REJECT if it uses character substitutions (leetspeak) "
             "to sneak in bad words. If it is ambiguous or nonsense, REJECT. "
+            "If the habit IS valid, you must also classify it into exactly one of these categories: "
+            "Movement, Sleep, Hydration, Mindfulness, Nutrition, Digital Detox. "
         )
         
         if ask_ai:
-            mod_prompt = base_mod_instruction + f"Otherwise, reply directly with ONLY a 1-sentence enthusiastic, validating cheer. DO NOT say 'APPROVE'. Habit: {habit}"
+            mod_prompt = category_instruction + (
+                "Reply in this exact format: CATEGORY|your 1-sentence enthusiastic cheer. "
+                "Example: Hydration|Amazing job staying hydrated today! "
+                f"Habit: {habit}"
+            )
         else:
-            mod_prompt = base_mod_instruction + f"Otherwise, reply with exactly the word APPROVE. Habit: {habit}"
+            mod_prompt = category_instruction + (
+                "Reply in this exact format: CATEGORY "
+                "Example: Hydration "
+                f"Habit: {habit}"
+            )
             
         mod_response = model.generate_content(mod_prompt)
-        result_text = mod_response.text.strip(' "\'')
+        result_text = mod_response.text.strip(' "\'\n')
         
         if "REJECT" in result_text.upper():
             print(f"AI Bouncer rejected post: {habit}")
             return jsonify({'success': False, 'error': 'rejected'})
+        
+        if ask_ai and '|' in result_text:
+            # Parse: "Category|Cheer text"
+            parts = result_text.split('|', 1)
+            ai_category = parts[0].strip()
+            ai_cheer = parts[1].strip() if len(parts) > 1 else None
             
-        if ask_ai and result_text.upper() != "APPROVE":
-            # Strip "APPROVE", "Approve.", "APPROVE: " etc. from the beginning
-            ai_cheer = re.sub(r'(?i)^APPROVE[\s\.\!\-\:]*', '', result_text).strip()
+            # Validate category
+            for vc in valid_categories:
+                if vc.lower() == ai_category.lower():
+                    category = vc
+                    break
+            
+            # Clean up cheer
+            if ai_cheer:
+                ai_cheer = re.sub(r'(?i)^APPROVE[\s\.\!\-\:]*', '', ai_cheer).strip()
             if not ai_cheer:
                 ai_cheer = "Great job on your wellness habit!"
+        else:
+            # No cheer requested — result is just the category name
+            ai_category = result_text.strip()
+            for vc in valid_categories:
+                if vc.lower() == ai_category.lower():
+                    category = vc
+                    break
             
     except Exception as e:
         print(f"Moderation error: {e}")
