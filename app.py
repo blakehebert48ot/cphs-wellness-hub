@@ -73,6 +73,17 @@ model = genai.GenerativeModel(
     )
 )
 
+# Separate model for moderation/categorization — no chat persona to interfere
+mod_model = genai.GenerativeModel(
+    model_name="gemini-2.5-flash-lite",
+    generation_config={
+        "temperature": 0.1,  # Low temp for consistent classification
+        "top_p": 0.95,
+        "top_k": 40,
+        "max_output_tokens": 256,  # Short responses only
+    },
+)
+
 app = Flask(__name__)
 app.secret_key = 'super-secret-wellness-key'  # Used for flash messages if needed
 
@@ -148,29 +159,56 @@ def submit_win():
     
     try:
         # Level 2: Hardened AI Bouncer + Auto-Categorizer
-        category_instruction = (
-            "Analyze this habit. It MUST be a genuine, healthy physical or mental wellness habit. "
-            "If it is toxic, offensive, dangerous, undeniable spam, or NOT a wellness habit at all, "
-            "reply with exactly the word REJECT. Also REJECT if it uses character substitutions (leetspeak) "
-            "to sneak in bad words. If it is ambiguous or nonsense, REJECT. "
-            "If the habit IS valid, you must also classify it into exactly one of these categories: "
-            "Movement, Sleep, Hydration, Mindfulness, Nutrition, Digital Detox. "
-        )
+        # Build a prompt that forces structured output
+        categories_list = ", ".join(valid_categories)
         
         if ask_ai:
-            mod_prompt = category_instruction + (
-                "Reply in this exact format: CATEGORY|your 1-sentence enthusiastic cheer. "
-                "Example: Hydration|Amazing job staying hydrated today! "
+            mod_prompt = (
+                "You are a content moderator AND categorizer for a student wellness app. "
+                "Given the following habit, do these steps:\n"
+                "1. If the habit is toxic, offensive, spam, nonsense, or NOT a real wellness habit, respond with ONLY: REJECT\n"
+                "2. If the habit IS valid, respond with EXACTLY two lines:\n"
+                f"   Line 1: One of these categories: {categories_list}\n"
+                "   Line 2: A 1-sentence enthusiastic cheer for the student\n"
+                "\n"
+                "Examples:\n"
+                "Habit: Drank 8 glasses of water\n"
+                "Hydration\n"
+                "Amazing job staying hydrated today!\n"
+                "\n"
+                "Habit: Went for a 30 minute run\n"
+                "Movement\n"
+                "Way to get your heart pumping!\n"
+                "\n"
+                "Habit: Slept 9 hours\n"
+                "Sleep\n"
+                "Your body thanks you for that rest!\n"
+                "\n"
+                "Habit: Meditated for 10 minutes\n"
+                "Mindfulness\n"
+                "Love that you took time to center yourself!\n"
+                "\n"
                 f"Habit: {habit}"
             )
         else:
-            mod_prompt = category_instruction + (
-                "Reply in this exact format: CATEGORY "
-                "Example: Hydration "
+            mod_prompt = (
+                "You are a content moderator AND categorizer for a student wellness app. "
+                "Given the following habit, do these steps:\n"
+                "1. If the habit is toxic, offensive, spam, nonsense, or NOT a real wellness habit, respond with ONLY: REJECT\n"
+                f"2. If the habit IS valid, respond with ONLY the category name. Choose from: {categories_list}\n"
+                "\n"
+                "Examples:\n"
+                "Habit: Drank 8 glasses of water -> Hydration\n"
+                "Habit: Went for a run -> Movement\n"
+                "Habit: Slept 9 hours -> Sleep\n"
+                "Habit: Meditated for 10 minutes -> Mindfulness\n"
+                "Habit: Ate a healthy salad -> Nutrition\n"
+                "Habit: No phone for 2 hours -> Digital Detox\n"
+                "\n"
                 f"Habit: {habit}"
             )
             
-        mod_response = model.generate_content(mod_prompt)
+        mod_response = mod_model.generate_content(mod_prompt)
         result_text = mod_response.text.strip(' "\'\n\r\t')
         print(f"[DEBUG] AI raw response for '{habit}': '{result_text}'")
         
@@ -179,32 +217,44 @@ def submit_win():
             return jsonify({'success': False, 'error': 'rejected'})
         
         def extract_category(text):
-            """Fuzzy-match a category name anywhere in the text."""
-            text_lower = text.lower().strip()
-            # Check longest names first to avoid partial matches (e.g. "Digital Detox" before "Digital")
-            for vc in sorted(valid_categories, key=len, reverse=True):
-                if vc.lower() in text_lower:
-                    return vc
+            """Extract category from AI response. Checks exact line matches first, then fuzzy."""
+            lines = [l.strip().strip('.*!:') for l in text.strip().splitlines() if l.strip()]
+            
+            # First pass: exact match on any line (most reliable)
+            for line in lines:
+                for vc in valid_categories:
+                    if line.lower() == vc.lower():
+                        return vc
+            
+            # Second pass: check if any line STARTS with a category name
+            for line in lines:
+                for vc in sorted(valid_categories, key=len, reverse=True):
+                    if line.lower().startswith(vc.lower()):
+                        return vc
+            
+            # Third pass: fuzzy check on first line only (avoid matching cheer text)
+            if lines:
+                first_line = lines[0].lower()
+                for vc in sorted(valid_categories, key=len, reverse=True):
+                    if vc.lower() in first_line:
+                        return vc
+            
             return None
         
-        if ask_ai and '|' in result_text:
-            # Parse: "Category|Cheer text"
-            parts = result_text.split('|', 1)
-            matched_cat = extract_category(parts[0])
-            if matched_cat:
-                category = matched_cat
-            ai_cheer = parts[1].strip() if len(parts) > 1 else None
-            
-            # Clean up cheer — strip any lingering APPROVE prefix or category leakage
-            if ai_cheer:
+        matched_cat = extract_category(result_text)
+        if matched_cat:
+            category = matched_cat
+        
+        # Extract cheer if requested
+        if ask_ai:
+            lines = [l.strip() for l in result_text.strip().splitlines() if l.strip()]
+            # The cheer is everything after the first line (which is the category)
+            cheer_lines = [l for l in lines if l.lower() not in [vc.lower() for vc in valid_categories]]
+            if cheer_lines:
+                ai_cheer = ' '.join(cheer_lines)
                 ai_cheer = re.sub(r'(?i)^APPROVE[\s\.\!\-\:]*', '', ai_cheer).strip()
             if not ai_cheer:
                 ai_cheer = "Great job on your wellness habit!"
-        else:
-            # No cheer requested, or AI didn't use pipe format — extract category from full response
-            matched_cat = extract_category(result_text)
-            if matched_cat:
-                category = matched_cat
         
         print(f"[DEBUG] Assigned category: '{category}' for habit: '{habit}'")
             
