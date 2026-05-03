@@ -152,10 +152,10 @@ def submit_win():
         return jsonify({'success': False, 'error': 'rejected'})
 
     ai_cheer = None
-    category = 'Movement'  # Default fallback
+    category = 'General'  # Default fallback
     
     # Valid categories the AI can assign
-    valid_categories = ['Movement', 'Sleep', 'Hydration', 'Mindfulness', 'Nutrition', 'Digital Detox']
+    valid_categories = ['Movement', 'Sleep', 'Hydration', 'Mindfulness', 'Nutrition', 'Digital Detox', 'General']
     
     try:
         # Level 2: Hardened AI Bouncer + Auto-Categorizer
@@ -166,10 +166,11 @@ def submit_win():
             mod_prompt = (
                 "You are a content moderator AND categorizer for a student wellness app. "
                 "Given the following habit, do these steps:\n"
-                "1. If the habit is toxic, offensive, spam, nonsense, or NOT a real wellness habit, respond with ONLY: REJECT\n"
-                "2. If the habit IS valid, respond with EXACTLY two lines:\n"
+                "1. If the habit is toxic, offensive, spam, nonsense, or harmful, respond with ONLY: REJECT\n"
+                "2. If the habit IS a positive activity, respond with EXACTLY two lines:\n"
                 f"   Line 1: One of these categories: {categories_list}\n"
                 "   Line 2: A 1-sentence enthusiastic cheer for the student\n"
+                "Use General for positive habits that don't fit the other categories.\n"
                 "\n"
                 "Examples:\n"
                 "Habit: Drank 8 glasses of water\n"
@@ -188,14 +189,19 @@ def submit_win():
                 "Mindfulness\n"
                 "Love that you took time to center yourself!\n"
                 "\n"
+                "Habit: Did all my homework\n"
+                "General\n"
+                "Crushing it with that productivity!\n"
+                "\n"
                 f"Habit: {habit}"
             )
         else:
             mod_prompt = (
                 "You are a content moderator AND categorizer for a student wellness app. "
                 "Given the following habit, do these steps:\n"
-                "1. If the habit is toxic, offensive, spam, nonsense, or NOT a real wellness habit, respond with ONLY: REJECT\n"
-                f"2. If the habit IS valid, respond with ONLY the category name. Choose from: {categories_list}\n"
+                "1. If the habit is toxic, offensive, spam, nonsense, or harmful, respond with ONLY: REJECT\n"
+                f"2. If the habit IS a positive activity, respond with ONLY the category name. Choose from: {categories_list}\n"
+                "Use General for positive habits that don't fit the other categories.\n"
                 "\n"
                 "Examples:\n"
                 "Habit: Drank 8 glasses of water -> Hydration\n"
@@ -204,6 +210,8 @@ def submit_win():
                 "Habit: Meditated for 10 minutes -> Mindfulness\n"
                 "Habit: Ate a healthy salad -> Nutrition\n"
                 "Habit: No phone for 2 hours -> Digital Detox\n"
+                "Habit: Did my homework -> General\n"
+                "Habit: Helped a friend -> General\n"
                 "\n"
                 f"Habit: {habit}"
             )
