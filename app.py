@@ -171,36 +171,42 @@ def submit_win():
             )
             
         mod_response = model.generate_content(mod_prompt)
-        result_text = mod_response.text.strip(' "\'\n')
+        result_text = mod_response.text.strip(' "\'\n\r\t')
+        print(f"[DEBUG] AI raw response for '{habit}': '{result_text}'")
         
         if "REJECT" in result_text.upper():
             print(f"AI Bouncer rejected post: {habit}")
             return jsonify({'success': False, 'error': 'rejected'})
         
+        def extract_category(text):
+            """Fuzzy-match a category name anywhere in the text."""
+            text_lower = text.lower().strip()
+            # Check longest names first to avoid partial matches (e.g. "Digital Detox" before "Digital")
+            for vc in sorted(valid_categories, key=len, reverse=True):
+                if vc.lower() in text_lower:
+                    return vc
+            return None
+        
         if ask_ai and '|' in result_text:
             # Parse: "Category|Cheer text"
             parts = result_text.split('|', 1)
-            ai_category = parts[0].strip()
+            matched_cat = extract_category(parts[0])
+            if matched_cat:
+                category = matched_cat
             ai_cheer = parts[1].strip() if len(parts) > 1 else None
             
-            # Validate category
-            for vc in valid_categories:
-                if vc.lower() == ai_category.lower():
-                    category = vc
-                    break
-            
-            # Clean up cheer
+            # Clean up cheer — strip any lingering APPROVE prefix or category leakage
             if ai_cheer:
                 ai_cheer = re.sub(r'(?i)^APPROVE[\s\.\!\-\:]*', '', ai_cheer).strip()
             if not ai_cheer:
                 ai_cheer = "Great job on your wellness habit!"
         else:
-            # No cheer requested — result is just the category name
-            ai_category = result_text.strip()
-            for vc in valid_categories:
-                if vc.lower() == ai_category.lower():
-                    category = vc
-                    break
+            # No cheer requested, or AI didn't use pipe format — extract category from full response
+            matched_cat = extract_category(result_text)
+            if matched_cat:
+                category = matched_cat
+        
+        print(f"[DEBUG] Assigned category: '{category}' for habit: '{habit}'")
             
     except Exception as e:
         print(f"Moderation error: {e}")
