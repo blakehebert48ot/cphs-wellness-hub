@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>{% block title %}CPHS Wellness Hub | Timberwolf Pride{% endblock %}</title>
     <meta name="description" content="A positive community wellness hub for CPHS students to share and track healthy daily habits.">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     
     <!-- Google Fonts: Inter -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -44,7 +45,7 @@
                 </button>
             </nav>
         </div>
-        <p>A collective pulse on wellness at our school.</p>
+        <p><span id="header-win-count">0</span> wins shared by the community 🔥</p>
     </header>
     
     <main>
@@ -54,7 +55,7 @@
     <!-- Floating Chat Widget -->
     <div class="floating-chat-container">
         <div class="chat-cta" id="chat-cta">
-            Need a study hack or de-stress break? Talk to your Peer Mentor!
+            Chat with your Peer Mentor 💬
         </div>
         <button id="chat-toggle-btn" class="chat-fab" aria-label="Open Peer Mentor Chat">
             <i class="fa-solid fa-user-graduate"></i>

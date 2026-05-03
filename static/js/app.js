@@ -178,7 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
             
             const data = await response.json();
             if (data.success) {
-                btn.querySelector('.upvote-count').textContent = data.upvotes;
+            btn.querySelector('.upvote-count').textContent = data.upvotes;
+                btn.querySelector('.upvote-count').style.display = '';
                 
                 // Simple pop animation logic
                 targetIcon.classList.remove('fa-regular');
@@ -359,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <time>${win.timestamp}</time>
                     </div>
                     <button class="upvote-btn" data-win-id="${win.id}" aria-label="Upvote this win">
-                        <i class="fa-regular fa-thumbs-up"></i> <span class="upvote-count">${win.upvotes}</span>
+                        <i class="fa-regular fa-thumbs-up"></i> <span class="upvote-count"${win.upvotes === 0 ? ' style="display:none"' : ''}>${win.upvotes}</span>
                     </button>
                 </div>
                 ${cheerHtml}
@@ -406,6 +407,10 @@ document.addEventListener('DOMContentLoaded', () => {
             
             // Update School Progress
             updateSchoolProgress(data.total_count || 0);
+
+            // Update header win counter
+            const headerCount = document.getElementById('header-win-count');
+            if (headerCount) headerCount.textContent = data.total_count || 0;
 
             const chartCanvas = document.getElementById('progressChart');
             if (!chartCanvas) return;

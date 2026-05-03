@@ -38,9 +38,7 @@
 <div class="main-grid">
     <!-- LEFT: Community Feed -->
     <section class="feed-section" aria-labelledby="feed-heading">
-        <div class="feed-header">
-            <h2 id="feed-heading">Community Feed</h2>
-        </div>
+        <h2 id="feed-heading" class="visually-hidden" style="display: none;">Community Feed</h2>
 
         <div id="ajax-error-container"></div>
         
@@ -86,7 +84,7 @@
                         <time datetime="{{ win['timestamp'] }}">{{ win['timestamp'] | format_time }}</time>
                     </div>
                     <button class="upvote-btn" data-win-id="{{ win['id'] }}" aria-label="Upvote this win">
-                        <i class="fa-regular fa-thumbs-up"></i> <span class="upvote-count">{{ win['upvotes'] }}</span>
+                        <i class="fa-regular fa-thumbs-up"></i> <span class="upvote-count"{% if win['upvotes'] == 0 %} style="display:none"{% endif %}>{{ win['upvotes'] }}</span>
                     </button>
                 </div>
                 
